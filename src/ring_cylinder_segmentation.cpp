@@ -63,16 +63,13 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   pcl::PointCloud<PointT>::Ptr cloud_cylinder (new pcl::PointCloud<PointT> ()), cloud_ring (new pcl::PointCloud<PointT> ());
 
   pcl::fromPCLPointCloud2 (*cloud_blob, *cloud);
-  //std::cerr << "PointCloud has: " << cloud->points.size () << " data points." << std::endl;
 
   // Build a passthrough filter to remove spurious NaNs
   pass.setInputCloud (cloud);
   pass.setFilterFieldName ("z");
   pass.setFilterLimits (0, 1.5);
   pass.filter (*cloud_filtered);
-  //std::cerr << "PointCloud after filtering has: " << cloud_filtered->points.size () << " data points." << std::endl;
 
-  // Estimate point normals
   ne.setSearchMethod (tree);
   ne.setInputCloud (cloud_filtered);
   ne.setKSearch (50);
@@ -181,14 +178,7 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   seg.segment (*inliers_cylinder, *coefficients_cylinder);
 
   double cyl_radius=coefficients_cylinder->values[6];
-
-  // double angle_0=pcl::getAngle3D(Eigen::Vector3f(coefficients_cylinder->values[3],coefficients_cylinder->values[4],coefficients_cylinder->values[5]),Eigen::Vector3f(1,0,0),true);
   double angle_y=pcl::getAngle3D(Eigen::Vector3f(coefficients_cylinder->values[3],coefficients_cylinder->values[4],coefficients_cylinder->values[5]),Eigen::Vector3f(0,1,0),true);
-  // double angle_2=pcl::getAngle3D(Eigen::Vector3f(coefficients_cylinder->values[3],coefficients_cylinder->values[4],coefficients_cylinder->values[5]),Eigen::Vector3f(0,0,1),true);
-
-  // std::cerr << "angle0: " << angle_0 << std::endl;
-  // std::cerr << "angle_y: " << angle_y << std::endl;
-  // std::cerr << "angle2: " << angle_2 << std::endl;
 
   // std::cerr << "Cylinder coefficients: " << *coefficients_cylinder << std::endl;
 
@@ -312,67 +302,6 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
     std::cerr << "Cylinder FOUND" << std::endl;
     std::cerr << "Cylinder FOUND" << std::endl;
   }
-
-  // if(cloud_ring->points.empty ()) {
-  //   std::cerr << "Can't find the ring component." << std::endl;
-  // }
-  // else {
-  //   pcl::compute3DCentroid (*cloud_ring, centroid_ring);
-
-  //   geometry_msgs::PointStamped point_camera_ring;
-  //   geometry_msgs::PointStamped point_map_ring;
-  //   visualization_msgs::Marker marker_ring;
-  //   geometry_msgs::TransformStamped tss_ring;
-
-  //   point_camera_ring.header.frame_id = "camera_rgb_optical_frame";
-  //   point_camera_ring.header.stamp = ros::Time::now();
-  //   point_map_ring.header.frame_id = "map";
-  //   point_map_ring.header.stamp = ros::Time::now();
-	// 	point_camera_ring.point.x = centroid_ring[0];
-	// 	point_camera_ring.point.y = centroid_ring[1];
-	// 	point_camera_ring.point.z = centroid_ring[2];
-
-	//   try{
-  //     tss_ring = tf2_buffer.lookupTransform("map","camera_rgb_optical_frame", time_rec_1);
-  //   }
-  //   catch (tf2::TransformException &ex)
-  //   {
-  //     ROS_WARN("Transform warning: %s\n", ex.what());
-  //   }
-
-  //   tf2::doTransform(point_camera_ring, point_map_ring, tss_ring);
-
-  //   marker_ring.header.frame_id = "map";
-  //   marker_ring.header.stamp = ros::Time::now();
-  //   marker_ring.ns = "ring";
-  //   marker_ring.id = marker_id++;
-  //   marker_ring.type = visualization_msgs::Marker::CUBE;
-  //   marker_ring.action = visualization_msgs::Marker::ADD;
-
-  //   if (std::isnan(point_map_ring.point.x) || (point_map_ring.point.z > 0.5)) {
-  //     return;
-  //   }
-
-  //   marker_ring.pose.position.x = point_map_ring.point.x;
-  //   marker_ring.pose.position.y = point_map_ring.point.y;
-  //   marker_ring.pose.position.z = point_map_ring.point.z;
-  //   marker_ring.pose.orientation.x = 0.0;
-  //   marker_ring.pose.orientation.y = 0.0;
-  //   marker_ring.pose.orientation.z = 0.0;
-  //   marker_ring.pose.orientation.w = 1.0;
-  //   marker_ring.scale.x = 0.1;
-  //   marker_ring.scale.y = 0.1;
-  //   marker_ring.scale.z = 0.1;
-  //   marker_ring.color.r=1.0f;
-  //   marker_ring.color.g=0.0f;
-  //   marker_ring.color.b=0.0f;
-  //   marker_ring.color.a=1.0f;
-  //   marker_ring.lifetime = ros::Duration();
-
-  //   ring_candidates_array.markers.push_back(marker_ring);
-  //   publish_ring_candidates.publish(ring_candidates_array);
-  // }
-
 }
 
 int

@@ -1,0 +1,17 @@
+<launch>
+    <include file="$(find exercise6)/launch/rins_world.launch"/>
+    <include file="$(find exercise6)/launch/amcl_simulation.launch"/>
+    <include file="$(find turtlebot_rviz_launchers)/launch/view_navigation.launch"/>
+
+    <node pkg="exercise6" type="main" name="main"  output="screen"/>
+    <node pkg="exercise6" type="ring_cylinder_segmentation" name="ring_cylinder_segmentation" output="screen">
+        <remap from="input" to="/camera/depth/points"/>
+    </node>
+
+    <!-- <node pkg="exercise6" type="cylinder_segmentation" name="cylinder_segmentation_node" output="screen"/> -->
+
+    <!-- <node pkg="exercise6" type="detect_rings" name="detect_rings_node" output="screen"/> -->
+
+    <!-- <node pkg="exercise6" type="face_localizer_dlib" name="face_localizer_node" /> -->
+    
+</launch>

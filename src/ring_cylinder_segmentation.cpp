@@ -30,7 +30,21 @@ visualization_msgs::MarkerArray cylinder_candidates_array, ring_candidates_array
 
 tf2_ros::Buffer tf2_buffer;
 int marker_id = 0;
-typedef pcl::PointXYZ PointT;
+
+typedef pcl::PointXYZRGBNormal PointT;
+typedef pcl::PointCloud<PointT> PointCloudT;
+
+int yellow_lower_r = 60, yellow_lower_g = 60, yellow_lower_b = 30;
+int yellow_upper_r = 120, yellow_upper_g = 120, yellow_upper_b = 80;
+int green_lower_r = 20, green_lower_g = 70, green_lower_b = 20;
+int green_upper_r = 60, green_upper_g = 150, green_upper_b = 60;
+int blue_lower_r = 30, blue_lower_g = 50, blue_lower_b = 70;
+int blue_upper_r = 70, blue_upper_g = 90, blue_upper_b = 120;
+int red_lower_r = 100, red_lower_g = 30, red_lower_b = 30;
+int red_upper_r = 160, red_upper_g = 100, red_upper_b = 100;
+bool red_detected = false, yellow_detected = false, green_detected = false, blue_detected = false;
+
+
 
 void
 cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
@@ -63,13 +77,16 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   pcl::PointCloud<PointT>::Ptr cloud_cylinder (new pcl::PointCloud<PointT> ()), cloud_ring (new pcl::PointCloud<PointT> ());
 
   pcl::fromPCLPointCloud2 (*cloud_blob, *cloud);
+  //std::cerr << "PointCloud has: " << cloud->points.size () << " data points." << std::endl;
 
   // Build a passthrough filter to remove spurious NaNs
   pass.setInputCloud (cloud);
   pass.setFilterFieldName ("z");
   pass.setFilterLimits (0, 1.5);
   pass.filter (*cloud_filtered);
+  //std::cerr << "PointCloud after filtering has: " << cloud_filtered->points.size () << " data points." << std::endl;
 
+  // Estimate point normals
   ne.setSearchMethod (tree);
   ne.setInputCloud (cloud_filtered);
   ne.setKSearch (50);
@@ -178,7 +195,14 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   seg.segment (*inliers_cylinder, *coefficients_cylinder);
 
   double cyl_radius=coefficients_cylinder->values[6];
+
+  // double angle_0=pcl::getAngle3D(Eigen::Vector3f(coefficients_cylinder->values[3],coefficients_cylinder->values[4],coefficients_cylinder->values[5]),Eigen::Vector3f(1,0,0),true);
   double angle_y=pcl::getAngle3D(Eigen::Vector3f(coefficients_cylinder->values[3],coefficients_cylinder->values[4],coefficients_cylinder->values[5]),Eigen::Vector3f(0,1,0),true);
+  // double angle_2=pcl::getAngle3D(Eigen::Vector3f(coefficients_cylinder->values[3],coefficients_cylinder->values[4],coefficients_cylinder->values[5]),Eigen::Vector3f(0,0,1),true);
+
+  // std::cerr << "angle0: " << angle_0 << std::endl;
+  // std::cerr << "angle_y: " << angle_y << std::endl;
+  // std::cerr << "angle2: " << angle_2 << std::endl;
 
   // std::cerr << "Cylinder coefficients: " << *coefficients_cylinder << std::endl;
 
@@ -186,6 +210,11 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   extract.setInputCloud (cloud_filtered2);
   extract.setIndices (inliers_cylinder);
   extract.filter (*cloud_cylinder);
+
+
+  
+
+
 
   // extract.setNegative (true);
   // extract.setInputCloud (cloud_filtered2);
@@ -272,6 +301,12 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
       return;
     }
 
+
+
+    pcl::PCLPointCloud2 outcloud;
+    pcl::toPCLPointCloud2 (*cloud_cylinder, outcloud);
+    publish_cylinder_pointcloud.publish (outcloud);
+
     marker_cylinder.pose.position.x = point_map_cylinder.point.x;
     marker_cylinder.pose.position.y = point_map_cylinder.point.y;
     marker_cylinder.pose.position.z = point_map_cylinder.point.z;
@@ -282,18 +317,97 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
     marker_cylinder.scale.x = coefficients_cylinder->values[6];
     marker_cylinder.scale.y = coefficients_cylinder->values[6];
     marker_cylinder.scale.z = 0.1;
-    marker_cylinder.color.r=0.0f;
-    marker_cylinder.color.g=1.0f;
-    marker_cylinder.color.b=0.0f;
+
     marker_cylinder.color.a=1.0f;
     marker_cylinder.lifetime = ros::Duration();
 
-    cylinder_candidates_array.markers.push_back(marker_cylinder);
-    publish_cylinder_candidates.publish(cylinder_candidates_array);
 
-    pcl::PCLPointCloud2 outcloud;
-    pcl::toPCLPointCloud2 (*cloud_cylinder, outcloud);
-    publish_cylinder_pointcloud.publish (outcloud);
+
+    // Initialize accumulated RGB values to zero
+    float r_total = 0.0, g_total = 0.0, b_total = 0.0;
+    int num_points = cloud_cylinder->points.size();
+
+    std::cerr << "COLOR IS: " << cloud_cylinder->points[1] << std::endl;
+    // Loop through each point and accumulate RGB values
+    for (int i = 0; i < num_points; i++) {
+      r_total += cloud_cylinder->points[i].r;
+      g_total += cloud_cylinder->points[i].g;
+      b_total += cloud_cylinder->points[i].b;
+    }
+
+    // Divide accumulated RGB values by the number of points to get the average
+    float r_avg = r_total / num_points;
+    float g_avg = g_total / num_points;
+    float b_avg = b_total / num_points;
+
+    std::cerr << "AVERAGE COLOR IS: " << r_avg << ", " << g_avg << ", " << b_avg << std::endl;
+
+    if (r_avg >= yellow_lower_r && r_avg <= yellow_upper_r &&
+        g_avg >= yellow_lower_g && g_avg <= yellow_upper_g &&
+        b_avg >= yellow_lower_b && b_avg <= yellow_upper_b) {
+        std::cout << "Yellow detected!" << std::endl;
+        if (!yellow_detected) {
+          marker_cylinder.color.r = 1.0f;
+          marker_cylinder.color.g = 1.0f;
+          marker_cylinder.color.b = 0.0f;
+          cylinder_candidates_array.markers.push_back(marker_cylinder);
+          publish_cylinder_candidates.publish(cylinder_candidates_array);
+          yellow_detected = true;
+          std::string cmd = "aplay /home/gal/ROS/src/exercise6/yellow_cylinder.wav";
+          std::system(cmd.c_str());
+        }
+    } else if (r_avg >= green_lower_r && r_avg <= green_upper_r &&
+               g_avg >= green_lower_g && g_avg <= green_upper_g &&
+               b_avg >= green_lower_b && b_avg <= green_upper_b) {
+        std::cout << "Green detected!" << std::endl;
+        if (!green_detected) {
+          marker_cylinder.color.r = 0.0f;
+          marker_cylinder.color.g = 1.0f;
+          marker_cylinder.color.b = 0.0f;
+          cylinder_candidates_array.markers.push_back(marker_cylinder);
+          publish_cylinder_candidates.publish(cylinder_candidates_array);
+          green_detected = true;
+          std::string cmd = "aplay /home/gal/ROS/src/exercise6/greencylinder.wav";
+          std::system(cmd.c_str());
+        }
+    } else if (r_avg >= blue_lower_r && r_avg <= blue_upper_r &&
+               g_avg >= blue_lower_g && g_avg <= blue_upper_g &&
+               b_avg >= blue_lower_b && b_avg <= blue_upper_b) {
+        std::cout << "Blue detected!" << std::endl;
+        if (!blue_detected) {
+          marker_cylinder.color.r = 0.0f;
+          marker_cylinder.color.g = 0.0f;
+          marker_cylinder.color.b = 1.0f;
+          cylinder_candidates_array.markers.push_back(marker_cylinder);
+          publish_cylinder_candidates.publish(cylinder_candidates_array);
+          blue_detected = true;
+          std::string cmd = "aplay /home/gal/ROS/src/exercise6/blue_cylinder.wav";
+          std::system(cmd.c_str());
+        }
+    } else if (r_avg >= red_lower_r && r_avg <= red_upper_r &&
+               g_avg >= red_lower_g && g_avg <= red_upper_g &&
+               b_avg >= red_lower_b && b_avg <= red_upper_b) {
+        std::cout << "Red detected!" << std::endl;
+        if (!red_detected) {
+          marker_cylinder.color.r = 1.0f;
+          marker_cylinder.color.g = 0.0f;
+          marker_cylinder.color.b = 0.0f;
+          cylinder_candidates_array.markers.push_back(marker_cylinder);
+          publish_cylinder_candidates.publish(cylinder_candidates_array);
+          red_detected = true;
+          std::string cmd = "aplay /home/gal/ROS/src/exercise6/red_cylinder.wav";
+          std::system(cmd.c_str());
+        }
+    } else {
+        std::cout << "No color detected." << std::endl;
+    }
+
+
+
+
+
+    // Create an RGB color object from the average values
+    //pcl::RGB avg_color(r_avg, g_avg, b_avg);
 
     // std::cerr << "Cylinder RADIUS: " << cyl_radius << std::endl;
     std::cerr << "Cylinder FOUND" << std::endl;
@@ -302,6 +416,67 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
     std::cerr << "Cylinder FOUND" << std::endl;
     std::cerr << "Cylinder FOUND" << std::endl;
   }
+
+  // if(cloud_ring->points.empty ()) {
+  //   std::cerr << "Can't find the ring component." << std::endl;
+  // }
+  // else {
+  //   pcl::compute3DCentroid (*cloud_ring, centroid_ring);
+
+  //   geometry_msgs::PointStamped point_camera_ring;
+  //   geometry_msgs::PointStamped point_map_ring;
+  //   visualization_msgs::Marker marker_ring;
+  //   geometry_msgs::TransformStamped tss_ring;
+
+  //   point_camera_ring.header.frame_id = "camera_rgb_optical_frame";
+  //   point_camera_ring.header.stamp = ros::Time::now();
+  //   point_map_ring.header.frame_id = "map";
+  //   point_map_ring.header.stamp = ros::Time::now();
+	// 	point_camera_ring.point.x = centroid_ring[0];
+	// 	point_camera_ring.point.y = centroid_ring[1];
+	// 	point_camera_ring.point.z = centroid_ring[2];
+
+	//   try{
+  //     tss_ring = tf2_buffer.lookupTransform("map","camera_rgb_optical_frame", time_rec_1);
+  //   }
+  //   catch (tf2::TransformException &ex)
+  //   {
+  //     ROS_WARN("Transform warning: %s\n", ex.what());
+  //   }
+
+  //   tf2::doTransform(point_camera_ring, point_map_ring, tss_ring);
+
+  //   marker_ring.header.frame_id = "map";
+  //   marker_ring.header.stamp = ros::Time::now();
+  //   marker_ring.ns = "ring";
+  //   marker_ring.id = marker_id++;
+  //   marker_ring.type = visualization_msgs::Marker::CUBE;
+  //   marker_ring.action = visualization_msgs::Marker::ADD;
+
+  //   if (std::isnan(point_map_ring.point.x) || (point_map_ring.point.z > 0.5)) {
+  //     return;
+  //   }
+
+  //   marker_ring.pose.position.x = point_map_ring.point.x;
+  //   marker_ring.pose.position.y = point_map_ring.point.y;
+  //   marker_ring.pose.position.z = point_map_ring.point.z;
+  //   marker_ring.pose.orientation.x = 0.0;
+  //   marker_ring.pose.orientation.y = 0.0;
+  //   marker_ring.pose.orientation.z = 0.0;
+  //   marker_ring.pose.orientation.w = 1.0;
+  //   marker_ring.scale.x = 0.1;
+  //   marker_ring.scale.y = 0.1;
+  //   marker_ring.scale.z = 0.1;
+  //   marker_ring.color.r=1.0f;
+  //   marker_ring.color.g=0.0f;
+  //   marker_ring.color.b=0.0f;
+  //   marker_ring.color.a=1.0f;
+  //   marker_ring.lifetime = ros::Duration();
+
+  //   ring_candidates_array.markers.push_back(marker_ring);
+  //   publish_ring_candidates.publish(ring_candidates_array);
+  // }
+
 }
 
 int

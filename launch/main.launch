@@ -3,7 +3,7 @@
     <include file="$(find exercise6)/launch/amcl_simulation.launch"/>
     <include file="$(find turtlebot_rviz_launchers)/launch/view_navigation.launch"/>
 
-    <node pkg="exercise6" type="main" name="main"  output="screen"/>
+    <!-- <node pkg="exercise6" type="main" name="main"  output="screen"/> -->
     <node pkg="exercise6" type="ring_cylinder_segmentation" name="ring_cylinder_segmentation" output="screen">
         <remap from="input" to="/camera/depth/points"/>
     </node>

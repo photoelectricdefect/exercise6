@@ -45,7 +45,151 @@ int red_lower_r = 100, red_lower_g = 30, red_lower_b = 30;
 int red_upper_r = 160, red_upper_g = 100, red_upper_b = 100;
 bool red_detected = false, yellow_detected = false, green_detected = false, blue_detected = false;
 
+void
+cloud_cb_arm (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
+{
+  std::cerr << "CIGO____1 CIGO_____1 CIGO_____1" << std::endl;
 
+  ros::Time time_rec_0, time_rec_1, time_test;
+  time_rec_0 = ros::Time::now();
+  time_rec_1 = ros::Time::now();
+
+  pcl::PassThrough<PointT> pass;
+  pcl::NormalEstimation<PointT, pcl::Normal> ne;
+  pcl::SACSegmentationFromNormals<PointT, pcl::Normal> seg;
+  pcl::PCDWriter writer;
+  pcl::ExtractIndices<PointT> extract;
+  pcl::ExtractIndices<pcl::Normal> extract_normals;
+  pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT> ());
+  Eigen::Vector4f centroid_ring;
+
+  pcl::PointCloud<PointT>::Ptr cloud (new pcl::PointCloud<PointT>);
+  pcl::PointCloud<PointT>::Ptr cloud_filtered (new pcl::PointCloud<PointT>);
+  pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
+  pcl::PointCloud<PointT>::Ptr cloud_filtered2 (new pcl::PointCloud<PointT>);
+  pcl::PointCloud<pcl::Normal>::Ptr cloud_normals2 (new pcl::PointCloud<pcl::Normal>);
+  pcl::PointCloud<PointT>::Ptr cloud_filtered3 (new pcl::PointCloud<PointT>);
+  pcl::PointCloud<pcl::Normal>::Ptr cloud_normals3 (new pcl::PointCloud<pcl::Normal>);
+  pcl::ModelCoefficients::Ptr coefficients_plane (new pcl::ModelCoefficients), coefficients_cylinder (new pcl::ModelCoefficients), coefficients_ring (new pcl::ModelCoefficients);
+  pcl::PointIndices::Ptr inliers_plane (new pcl::PointIndices), inliers_cylinder (new pcl::PointIndices), inliers_ring (new pcl::PointIndices);
+  pcl::PointCloud<PointT>::Ptr cloud_cylinder (new pcl::PointCloud<PointT> ()), cloud_ring (new pcl::PointCloud<PointT> ());
+
+  pcl::fromPCLPointCloud2 (*cloud_blob, *cloud);
+  //std::cerr << "PointCloud has: " << cloud->points.size () << " data points." << std::endl;
+
+  pass.setInputCloud (cloud);
+  pass.setFilterFieldName("y");
+  pass.setFilterLimits(-0.5, 0.1);
+  pass.filter(*cloud_filtered);
+
+  //std::cerr << "PointCloud after filtering has: " << cloud_filtered->points.size () << " data points." << std::endl;
+
+  ne.setSearchMethod (tree);
+  ne.setInputCloud (cloud_filtered);
+  ne.setKSearch (50);
+  ne.compute (*cloud_normals);
+
+  ////////////////////////////////////
+  ////////////////////////////////////
+
+  seg.setOptimizeCoefficients (true);
+  seg.setModelType (pcl::SACMODEL_CYLINDER);
+  seg.setMethodType (pcl::SAC_RANSAC);
+
+  // seg.setNormalDistanceWeight (0.1);
+  // seg.setMaxIterations (10000);
+  // seg.setDistanceThreshold (0.05);
+
+  seg.setNormalDistanceWeight (0.01);
+  seg.setMaxIterations (10000);
+  seg.setDistanceThreshold (0.05);
+  seg.setRadiusLimits (0.06, 0.2);
+
+  seg.setInputCloud (cloud_filtered);
+  seg.setInputNormals (cloud_normals);
+  seg.segment (*inliers_ring, *coefficients_ring);
+
+  // // std::cerr << "Ring coefficients: " << *coefficients_ring << std::endl;
+
+  extract.setNegative (false);
+  extract.setInputCloud (cloud_filtered);
+  extract.setIndices (inliers_ring);
+  extract.filter (*cloud_ring);
+
+  ////////////////////////////////////
+  ////////////////////////////////////
+
+  if(cloud_ring->points.empty ()) {
+    std::cerr << "Can't find the ring component." << std::endl;
+  }
+  else {
+    pcl::compute3DCentroid (*cloud_ring, centroid_ring);
+
+    geometry_msgs::PointStamped point_camera_ring;
+    geometry_msgs::PointStamped point_map_ring;
+    visualization_msgs::Marker marker_ring;
+    geometry_msgs::TransformStamped tss_ring;
+
+    point_camera_ring.header.frame_id = "camera_rgb_optical_frame";
+    point_camera_ring.header.stamp = ros::Time::now();
+    point_map_ring.header.frame_id = "map";
+    point_map_ring.header.stamp = ros::Time::now();
+		point_camera_ring.point.x = centroid_ring[0];
+		point_camera_ring.point.y = centroid_ring[1];
+		point_camera_ring.point.z = centroid_ring[2];
+
+	  try{
+      tss_ring = tf2_buffer.lookupTransform("map","camera_rgb_optical_frame", time_rec_1);
+    }
+    catch (tf2::TransformException &ex)
+    {
+      ROS_WARN("Transform warning: %s\n", ex.what());
+    }
+
+    tf2::doTransform(point_camera_ring, point_map_ring, tss_ring);
+
+    marker_ring.header.frame_id = "map";
+    marker_ring.header.stamp = ros::Time::now();
+    marker_ring.ns = "ring";
+    marker_ring.id = marker_id++;
+    marker_ring.type = visualization_msgs::Marker::ARROW;
+    marker_ring.action = visualization_msgs::Marker::ADD;
+
+    if (std::isnan(point_map_ring.point.x)) {
+      return;
+    }
+
+    pcl::PCLPointCloud2 outcloud;
+    pcl::toPCLPointCloud2 (*cloud_ring, outcloud);
+    publish_ring_pointcloud.publish (outcloud);
+
+    marker_ring.pose.position.x = point_map_ring.point.x;
+    marker_ring.pose.position.y = point_map_ring.point.y;
+    marker_ring.pose.position.z = point_map_ring.point.z;
+    marker_ring.pose.orientation.x = coefficients_ring->values[3];
+    marker_ring.pose.orientation.y = coefficients_ring->values[4];
+    marker_ring.pose.orientation.z = coefficients_ring->values[5];
+    marker_ring.pose.orientation.w = 0;
+    marker_ring.scale.x = coefficients_ring->values[6];
+    marker_ring.scale.y = coefficients_ring->values[6];
+    marker_ring.scale.z = 0.1;
+
+    marker_ring.color.r=1.0f;
+    marker_ring.color.g=0.0f;
+    marker_ring.color.b=0.0f;
+    marker_ring.color.a=1.0f;
+    marker_ring.lifetime = ros::Duration();
+
+    ring_candidates_array.markers.push_back(marker_ring);
+    publish_ring_candidates.publish(ring_candidates_array);
+  
+    std::cerr << "Ring FOUND" << std::endl;
+    std::cerr << "Ring FOUND" << std::endl;
+    std::cerr << "Ring FOUND" << std::endl;
+    std::cerr << "Ring FOUND" << std::endl;
+    std::cerr << "Ring FOUND" << std::endl;
+  }
+}
 
 void
 cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
@@ -80,19 +224,16 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   pcl::fromPCLPointCloud2 (*cloud_blob, *cloud);
   //std::cerr << "PointCloud has: " << cloud->points.size () << " data points." << std::endl;
 
-  // Build a passthrough filter to remove spurious NaNs
   pass.setInputCloud (cloud);
   pass.setFilterFieldName ("z");
   pass.setFilterLimits (0, 1.5);
   pass.filter (*cloud_filtered);
   //std::cerr << "PointCloud after filtering has: " << cloud_filtered->points.size () << " data points." << std::endl;
 
-  // Estimate point normals
   ne.setSearchMethod (tree);
   ne.setInputCloud (cloud_filtered);
   ne.setKSearch (50);
   ne.compute (*cloud_normals);
-
 
   int iter = 0, nr_points = (int) cloud_filtered->size();
   int size_cloud_filtered=cloud_filtered->size();
@@ -115,11 +256,6 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
     }
 
     seg.segment (*inliers_plane, *coefficients_plane);
-
-    // if(inliers_plane->indices.size() <= 0) {
-    //   size_cloud_filtered=0;
-    //   break;
-    // }
 
     extract.setNegative (true);
 
@@ -156,29 +292,6 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
     return;
   }
 
-  // // Create the segmentation object for the planar model and set all the parameters
-  // seg.setOptimizeCoefficients (true);
-  // seg.setModelType (pcl::SACMODEL_NORMAL_PLANE);
-  // seg.setNormalDistanceWeight (0.1);
-  // seg.setMethodType (pcl::SAC_RANSAC);
-  // seg.setMaxIterations (100);
-  // seg.setDistanceThreshold (0.03);
-  // seg.setInputCloud (cloud_filtered);
-  // seg.setInputNormals (cloud_normals);
-  // seg.segment (*inliers_plane, *coefficients_plane);
-
-  // //std::cerr << "Plane coefficients: " << *coefficients_plane << std::endl;
-
-  // extract.setNegative (true);
-  // extract.setInputCloud (cloud_filtered);
-  // extract.setIndices (inliers_plane);
-  // extract.filter (*cloud_filtered2);
-
-  // extract_normals.setNegative (true);
-  // extract_normals.setInputCloud (cloud_normals);
-  // extract_normals.setIndices (inliers_plane);
-  // extract_normals.filter (*cloud_normals2);
-
   ////////////////////////////////////
   ////////////////////////////////////
 
@@ -189,21 +302,13 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   seg.setNormalDistanceWeight (0.01);
   seg.setMaxIterations (10000);
   seg.setDistanceThreshold (0.05);
-  // seg.setRadiusLimits (0.06, 0.2);
   seg.setRadiusLimits (0.06, 0.2);
   seg.setInputCloud (cloud_filtered2);
   seg.setInputNormals (cloud_normals2);
   seg.segment (*inliers_cylinder, *coefficients_cylinder);
 
   double cyl_radius=coefficients_cylinder->values[6];
-
-  // double angle_0=pcl::getAngle3D(Eigen::Vector3f(coefficients_cylinder->values[3],coefficients_cylinder->values[4],coefficients_cylinder->values[5]),Eigen::Vector3f(1,0,0),true);
   double angle_y=pcl::getAngle3D(Eigen::Vector3f(coefficients_cylinder->values[3],coefficients_cylinder->values[4],coefficients_cylinder->values[5]),Eigen::Vector3f(0,1,0),true);
-  // double angle_2=pcl::getAngle3D(Eigen::Vector3f(coefficients_cylinder->values[3],coefficients_cylinder->values[4],coefficients_cylinder->values[5]),Eigen::Vector3f(0,0,1),true);
-
-  // std::cerr << "angle0: " << angle_0 << std::endl;
-  // std::cerr << "angle_y: " << angle_y << std::endl;
-  // std::cerr << "angle2: " << angle_2 << std::endl;
 
   // std::cerr << "Cylinder coefficients: " << *coefficients_cylinder << std::endl;
 
@@ -227,23 +332,23 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   ////////////////////////////////////
 
   // // Create the segmentation object for ring segmentation and set all the parameters
-  seg.setOptimizeCoefficients (true);
-  seg.setModelType (pcl::SACMODEL_CIRCLE3D);
-  seg.setMethodType (pcl::SAC_RANSAC);
-  seg.setNormalDistanceWeight (0.1);
-  seg.setMaxIterations (10000);
-  seg.setDistanceThreshold (0.05);
-  // seg.setRadiusLimits (0.06, 0.2);
-  seg.setInputCloud (cloud_filtered2);
-  seg.setInputNormals (cloud_normals2);
-  seg.segment (*inliers_ring, *coefficients_ring);
+  // seg.setOptimizeCoefficients (true);
+  // seg.setModelType (pcl::SACMODEL_CIRCLE3D);
+  // seg.setMethodType (pcl::SAC_RANSAC);
+  // seg.setNormalDistanceWeight (0.1);
+  // seg.setMaxIterations (10000);
+  // seg.setDistanceThreshold (0.05);
+  // // seg.setRadiusLimits (0.06, 0.2);
+  // seg.setInputCloud (cloud_filtered2);
+  // seg.setInputNormals (cloud_normals2);
+  // seg.segment (*inliers_ring, *coefficients_ring);
 
-  // // std::cerr << "Ring coefficients: " << *coefficients_ring << std::endl;
+  // // // std::cerr << "Ring coefficients: " << *coefficients_ring << std::endl;
 
-  extract.setNegative (false);
-  extract.setInputCloud (cloud_filtered2);
-  extract.setIndices (inliers_ring);
-  extract.filter (*cloud_ring);
+  // extract.setNegative (false);
+  // extract.setInputCloud (cloud_filtered2);
+  // extract.setIndices (inliers_ring);
+  // extract.filter (*cloud_ring);
 
   ////////////////////////////////////
   ////////////////////////////////////
@@ -438,96 +543,96 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
     std::cerr << "Cylinder FOUND" << std::endl;
   }
 
-  if(cloud_ring->points.empty ()) {
-    std::cerr << "Can't find the ring component." << std::endl;
-  }
-  else {
-    pcl::compute3DCentroid (*cloud_ring, centroid_ring);
+  // if(cloud_ring->points.empty ()) {
+  //   std::cerr << "Can't find the ring component." << std::endl;
+  // }
+  // else {
+  //   pcl::compute3DCentroid (*cloud_ring, centroid_ring);
 
-    geometry_msgs::PointStamped point_camera_ring;
-    geometry_msgs::PointStamped point_map_ring;
-    visualization_msgs::Marker marker_ring;
-    geometry_msgs::TransformStamped tss_ring;
+  //   geometry_msgs::PointStamped point_camera_ring;
+  //   geometry_msgs::PointStamped point_map_ring;
+  //   visualization_msgs::Marker marker_ring;
+  //   geometry_msgs::TransformStamped tss_ring;
 
-    point_camera_ring.header.frame_id = "camera_rgb_optical_frame";
-    point_camera_ring.header.stamp = ros::Time::now();
-    point_map_ring.header.frame_id = "map";
-    point_map_ring.header.stamp = ros::Time::now();
-		point_camera_ring.point.x = centroid_ring[0];
-		point_camera_ring.point.y = centroid_ring[1];
-		point_camera_ring.point.z = centroid_ring[2];
+  //   point_camera_ring.header.frame_id = "camera_rgb_optical_frame";
+  //   point_camera_ring.header.stamp = ros::Time::now();
+  //   point_map_ring.header.frame_id = "map";
+  //   point_map_ring.header.stamp = ros::Time::now();
+	// 	point_camera_ring.point.x = centroid_ring[0];
+	// 	point_camera_ring.point.y = centroid_ring[1];
+	// 	point_camera_ring.point.z = centroid_ring[2];
 
-	  try{
-      tss_ring = tf2_buffer.lookupTransform("map","camera_rgb_optical_frame", time_rec_1);
-    }
-    catch (tf2::TransformException &ex)
-    {
-      ROS_WARN("Transform warning: %s\n", ex.what());
-    }
+	//   try{
+  //     tss_ring = tf2_buffer.lookupTransform("map","camera_rgb_optical_frame", time_rec_1);
+  //   }
+  //   catch (tf2::TransformException &ex)
+  //   {
+  //     ROS_WARN("Transform warning: %s\n", ex.what());
+  //   }
 
-    tf2::doTransform(point_camera_ring, point_map_ring, tss_ring);
+  //   tf2::doTransform(point_camera_ring, point_map_ring, tss_ring);
 
-    marker_ring.header.frame_id = "map";
-    marker_ring.header.stamp = ros::Time::now();
-    marker_ring.ns = "ring";
-    marker_ring.id = marker_id++;
-    marker_ring.type = visualization_msgs::Marker::ARROW;
-    marker_ring.action = visualization_msgs::Marker::ADD;
+  //   marker_ring.header.frame_id = "map";
+  //   marker_ring.header.stamp = ros::Time::now();
+  //   marker_ring.ns = "ring";
+  //   marker_ring.id = marker_id++;
+  //   marker_ring.type = visualization_msgs::Marker::ARROW;
+  //   marker_ring.action = visualization_msgs::Marker::ADD;
 
-    if (std::isnan(point_map_ring.point.x)) {
-      return;
-    }
+  //   if (std::isnan(point_map_ring.point.x)) {
+  //     return;
+  //   }
 
-    pcl::PCLPointCloud2 outcloud;
-    pcl::toPCLPointCloud2 (*cloud_ring, outcloud);
-    publish_ring_pointcloud.publish (outcloud);
+  //   pcl::PCLPointCloud2 outcloud;
+  //   pcl::toPCLPointCloud2 (*cloud_ring, outcloud);
+  //   publish_ring_pointcloud.publish (outcloud);
 
-    marker_ring.pose.position.x = point_map_ring.point.x;
-    marker_ring.pose.position.y = point_map_ring.point.y;
-    marker_ring.pose.position.z = point_map_ring.point.z;
-    marker_ring.pose.orientation.x = coefficients_ring->values[4];
-    marker_ring.pose.orientation.y = coefficients_ring->values[5];
-    marker_ring.pose.orientation.z = coefficients_ring->values[6];
-    marker_ring.pose.orientation.w = 0;
-    marker_ring.scale.x = coefficients_ring->values[3];
-    marker_ring.scale.y = coefficients_ring->values[3];
-    marker_ring.scale.z = 0.1;
-
-
+  //   marker_ring.pose.position.x = point_map_ring.point.x;
+  //   marker_ring.pose.position.y = point_map_ring.point.y;
+  //   marker_ring.pose.position.z = point_map_ring.point.z;
+  //   marker_ring.pose.orientation.x = coefficients_ring->values[4];
+  //   marker_ring.pose.orientation.y = coefficients_ring->values[5];
+  //   marker_ring.pose.orientation.z = coefficients_ring->values[6];
+  //   marker_ring.pose.orientation.w = 0;
+  //   marker_ring.scale.x = coefficients_ring->values[3];
+  //   marker_ring.scale.y = coefficients_ring->values[3];
+  //   marker_ring.scale.z = 0.1;
 
 
 
-    // if (std::isnan(point_map_ring.point.x) || (point_map_ring.point.z > 0.5)) {
-    //   return;
-    // }
-
-    // marker_ring.pose.position.x = point_map_ring.point.x;
-    // marker_ring.pose.position.y = point_map_ring.point.y;
-    // marker_ring.pose.position.z = point_map_ring.point.z;
-    // marker_ring.pose.orientation.x = 0.0;
-    // marker_ring.pose.orientation.y = 0.0;
-    // marker_ring.pose.orientation.z = 0.0;
-    // marker_ring.pose.orientation.w = 1.0;
-    // marker_ring.scale.x = 0.1;
-    // marker_ring.scale.y = 0.1;
-    // marker_ring.scale.z = 0.1;
 
 
-    marker_ring.color.r=1.0f;
-    marker_ring.color.g=0.0f;
-    marker_ring.color.b=0.0f;
-    marker_ring.color.a=1.0f;
-    marker_ring.lifetime = ros::Duration();
+  //   // if (std::isnan(point_map_ring.point.x) || (point_map_ring.point.z > 0.5)) {
+  //   //   return;
+  //   // }
 
-    ring_candidates_array.markers.push_back(marker_ring);
-    publish_ring_candidates.publish(ring_candidates_array);
+  //   // marker_ring.pose.position.x = point_map_ring.point.x;
+  //   // marker_ring.pose.position.y = point_map_ring.point.y;
+  //   // marker_ring.pose.position.z = point_map_ring.point.z;
+  //   // marker_ring.pose.orientation.x = 0.0;
+  //   // marker_ring.pose.orientation.y = 0.0;
+  //   // marker_ring.pose.orientation.z = 0.0;
+  //   // marker_ring.pose.orientation.w = 1.0;
+  //   // marker_ring.scale.x = 0.1;
+  //   // marker_ring.scale.y = 0.1;
+  //   // marker_ring.scale.z = 0.1;
+
+
+  //   marker_ring.color.r=1.0f;
+  //   marker_ring.color.g=0.0f;
+  //   marker_ring.color.b=0.0f;
+  //   marker_ring.color.a=1.0f;
+  //   marker_ring.lifetime = ros::Duration();
+
+  //   ring_candidates_array.markers.push_back(marker_ring);
+  //   publish_ring_candidates.publish(ring_candidates_array);
   
-    std::cerr << "Ring FOUND" << std::endl;
-    std::cerr << "Ring FOUND" << std::endl;
-    std::cerr << "Ring FOUND" << std::endl;
-    std::cerr << "Ring FOUND" << std::endl;
-    std::cerr << "Ring FOUND" << std::endl;
-  }
+  //   std::cerr << "Ring FOUND" << std::endl;
+  //   std::cerr << "Ring FOUND" << std::endl;
+  //   std::cerr << "Ring FOUND" << std::endl;
+  //   std::cerr << "Ring FOUND" << std::endl;
+  //   std::cerr << "Ring FOUND" << std::endl;
+  // }
 
 }
 
@@ -541,6 +646,7 @@ main (int argc, char** argv)
 
   tf2_ros::TransformListener tf2_listener(tf2_buffer);
   ros::Subscriber sub = nh.subscribe ("input", 1, cloud_cb);
+  ros::Subscriber sub_arm = nh.subscribe ("/arm_camera/depth/points", 1, cloud_cb_arm);
 
   publish_cylinder_candidates = nh.advertise<visualization_msgs::MarkerArray>("cylinder_markers", 10);
   publish_ring_candidates = nh.advertise<visualization_msgs::MarkerArray>("ring_markers", 10);

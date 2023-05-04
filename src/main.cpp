@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
         ac.sendGoal(goal, &cb_done, &cb_active, &cb_feedback);
         ac.waitForResult();
 
-        if (green_found) {
+        /*if (green_found) {
             move_base_msgs::MoveBaseGoal goal;
             goal.target_pose.header.frame_id = "map";
             goal.target_pose.header.stamp = ros::Time::now();
@@ -147,7 +147,7 @@ int main(int argc, char** argv) {
             arm_pub.publish(msg_arm);
             break;
 
-        }
+        }*/
 
     
         if(flag_arrived) {
@@ -155,13 +155,14 @@ int main(int argc, char** argv) {
 
             
 
-            for(int i=0;i<n_steps;i++) {
+            /*for(int i=0;i<n_steps;i++) {
                geometry_msgs::Twist msg;
                msg.linear.x = 0;
                 msg.angular.z = (4.0*3.14)/(double)n_steps;
                 pub.publish(msg);
                 rate.sleep();
             }
+            */
         }
 
         
@@ -175,6 +176,28 @@ int main(int argc, char** argv) {
         // if (num_of_faces == 3) {
         //     break;
         // }
+    }
+    if (green_found) {
+        move_base_msgs::MoveBaseGoal goal;
+        goal.target_pose.header.frame_id = "map";
+        goal.target_pose.header.stamp = ros::Time::now();
+        goal.target_pose.pose.position.x = green_x;
+        goal.target_pose.pose.position.y = green_y;
+        goal.target_pose.pose.orientation.w=1;
+
+        ROS_INFO("sending destination");
+        ac.sendGoal(goal, &cb_done, &cb_active, &cb_feedback);
+        ac.waitForResult();
+
+
+        std_msgs::String msg_park;
+        msg_park.data = "parking_on";
+        std_msgs::String msg_arm;
+        msg_arm.data = "extend";
+
+
+        parking_pub.publish(msg_park);
+        arm_pub.publish(msg_arm);
     }
 
     ROS_INFO("FINISHED");

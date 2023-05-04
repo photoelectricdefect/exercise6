@@ -196,8 +196,8 @@ cloud_cb_arm (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
 
 
     Eigen::Vector3f c_avg(r_avg,g_avg,b_avg);
-    Eigen::Vector3f R(255,25,0);
-    Eigen::Vector3f G(3,255,6);
+    Eigen::Vector3f R(255,0,0);
+    Eigen::Vector3f G(0,255,0);
     Eigen::Vector3f B(58,143,255);
     Eigen::Vector3f Black(0,0,0);
     Eigen::Vector3f gray(128,128,128);
@@ -547,8 +547,8 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
 
 
     Eigen::Vector3f c_avg(r_avg,g_avg,b_avg);
-    Eigen::Vector3f R(255,25,0);
-    Eigen::Vector3f G(9,255,6);
+    Eigen::Vector3f R(255,0,0);
+    Eigen::Vector3f G(0,255,0);
     Eigen::Vector3f B(58,143,255);
     Eigen::Vector3f Y(255,249,19);
     Eigen::Vector3f gray(128,128,128);

@@ -26,7 +26,7 @@
 #include <algorithm>    // std::min
 
 // cylinder candidates
-ros::Publisher publish_cylinder_candidates, publish_ring_candidates, publish_cylinder_pointcloud, publish_ring_pointcloud;
+ros::Publisher publish_cylinder_candidates, publish_ring_candidates, publish_cylinder_pointcloud, publish_ring_pointcloud, green_ring_pub;
 visualization_msgs::MarkerArray cylinder_candidates_array, ring_candidates_array;
 
 tf2_ros::Buffer tf2_buffer;
@@ -44,6 +44,7 @@ int blue_upper_r = 70, blue_upper_g = 90, blue_upper_b = 120;
 int red_lower_r = 100, red_lower_g = 30, red_lower_b = 30;
 int red_upper_r = 160, red_upper_g = 100, red_upper_b = 100;
 bool red_detected = false, yellow_detected = false, green_detected = false, blue_detected = false;
+bool red_ring_detected = false, black_ring_detected = false, green_ring_detected = false, blue_ring_detected = false;
 
 void
 cloud_cb_arm (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
@@ -173,15 +174,118 @@ cloud_cb_arm (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
     marker_ring.scale.x = coefficients_ring->values[6];
     marker_ring.scale.y = coefficients_ring->values[6];
     marker_ring.scale.z = 0.1;
-
-    marker_ring.color.r=1.0f;
-    marker_ring.color.g=0.0f;
-    marker_ring.color.b=0.0f;
     marker_ring.color.a=1.0f;
     marker_ring.lifetime = ros::Duration();
 
-    ring_candidates_array.markers.push_back(marker_ring);
-    publish_ring_candidates.publish(ring_candidates_array);
+    // Initialize accumulated RGB values to zero
+    float r_total = 0.0, g_total = 0.0, b_total = 0.0;
+    int num_points = cloud_ring->points.size();
+
+    // std::cerr << "COLOR IS: " << cloud_cylinder->points[1] << std::endl;
+    // Loop through each point and accumulate RGB values
+    for (int i = 0; i < num_points; i++) {
+      r_total += cloud_ring->points[i].r;
+      g_total += cloud_ring->points[i].g;
+      b_total += cloud_ring->points[i].b;
+    }
+
+    // Divide accumulated RGB values by the number of points to get the average
+    float r_avg = r_total / num_points;
+    float g_avg = g_total / num_points;
+    float b_avg = b_total / num_points;
+
+
+    Eigen::Vector3f c_avg(r_avg,g_avg,b_avg);
+    Eigen::Vector3f R(255,25,0);
+    Eigen::Vector3f G(3,255,6);
+    Eigen::Vector3f B(58,143,255);
+    Eigen::Vector3f Black(0,0,0);
+    Eigen::Vector3f gray(128,128,128);
+
+    double d_R=(c_avg-R).norm();
+    double d_G=(c_avg-G).norm();
+    double d_B=(c_avg-B).norm();
+    double d_black=(c_avg-Black).norm();
+    double d_gray=(c_avg-gray).norm();
+
+    double c_min=std::min(1e6,d_R);
+    c_min=std::min(c_min,d_G);
+    c_min=std::min(c_min,d_B);
+    c_min=std::min(c_min,d_black);
+    c_min=std::min(c_min,d_gray);
+
+    std::cerr << "AVERAGE RING COLOR IS: " << r_avg << ", " << g_avg << ", " << b_avg << std::endl;
+
+
+    if(c_min==d_black) {
+        std::cout << "Black ring detected!" << std::endl;
+        if (!black_ring_detected) {
+          marker_ring.color.r=0.0f;
+          marker_ring.color.g=0.0f;
+          marker_ring.color.b=0.0f;
+          ring_candidates_array.markers.push_back(marker_ring);
+          publish_ring_candidates.publish(ring_candidates_array);
+          black_ring_detected = true;
+          std::string cmd = "aplay /home/gal/ROS/src/exercise6/black_ring.wav";
+          std::system(cmd.c_str());
+        }
+    } 
+
+    else if(c_min==d_G) {
+        std::cout << "Green ring detected!" << std::endl;
+        if (!green_ring_detected) {
+          marker_ring.color.r=0.0f;
+          marker_ring.color.g=1.0f;
+          marker_ring.color.b=0.0f;
+          ring_candidates_array.markers.push_back(marker_ring);
+          publish_ring_candidates.publish(ring_candidates_array);
+
+          green_ring_pub.publish(marker_ring);
+
+          green_ring_detected = true;
+          std::string cmd = "aplay /home/gal/ROS/src/exercise6/green_ring.wav";
+          std::system(cmd.c_str());
+        }
+    } 
+
+    else if(c_min==d_B) {
+        std::cout << "Blue ring detected!" << std::endl;
+        if (!black_ring_detected) {
+          marker_ring.color.r=0.0f;
+          marker_ring.color.g=0.0f;
+          marker_ring.color.b=1.0f;
+          ring_candidates_array.markers.push_back(marker_ring);
+          publish_ring_candidates.publish(ring_candidates_array);
+          blue_ring_detected = true;
+          std::string cmd = "aplay /home/gal/ROS/src/exercise6/blue_ring.wav";
+          std::system(cmd.c_str());
+        }
+    } 
+   
+    else if(c_min==d_R) {
+        std::cout << "Red ring detected!" << std::endl;
+        if (!red_ring_detected) {
+          marker_ring.color.r = 1.0f;
+          marker_ring.color.g = 0.0f;
+          marker_ring.color.b = 0.0f;
+          ring_candidates_array.markers.push_back(marker_ring);
+          publish_ring_candidates.publish(ring_candidates_array);
+          red_ring_detected = true;
+          std::string cmd = "aplay /home/gal/ROS/src/exercise6/red_ring.wav";
+          std::system(cmd.c_str());
+        }
+    } 
+
+    else if(c_min==d_gray) {    
+        std::cout << "No ring color detected." << std::endl;
+    }
+
+
+
+    
+    
+
+
   
     std::cerr << "Ring FOUND" << std::endl;
     std::cerr << "Ring FOUND" << std::endl;
@@ -443,10 +547,10 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
 
 
     Eigen::Vector3f c_avg(r_avg,g_avg,b_avg);
-    Eigen::Vector3f R(255,0,0);
-    Eigen::Vector3f G(0,255,0);
-    Eigen::Vector3f B(0,0,255);
-    Eigen::Vector3f Y(255,255,0);
+    Eigen::Vector3f R(255,25,0);
+    Eigen::Vector3f G(9,255,6);
+    Eigen::Vector3f B(58,143,255);
+    Eigen::Vector3f Y(255,249,19);
     Eigen::Vector3f gray(128,128,128);
 
     double d_R=(c_avg-R).norm();
@@ -491,7 +595,7 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
           cylinder_candidates_array.markers.push_back(marker_cylinder);
           publish_cylinder_candidates.publish(cylinder_candidates_array);
           green_detected = true;
-          std::string cmd = "aplay /home/gal/ROS/src/exercise6/greencylinder.wav";
+          std::string cmd = "aplay /home/gal/ROS/src/exercise6/green_cylinder.wav";
           std::system(cmd.c_str());
         }
     } 
@@ -653,6 +757,7 @@ main (int argc, char** argv)
 
   publish_cylinder_pointcloud = nh.advertise<pcl::PCLPointCloud2> ("cloud_cylinder", 1);
   publish_ring_pointcloud = nh.advertise<pcl::PCLPointCloud2> ("cloud_ring", 1);
+  green_ring_pub = nh.advertise<visualization_msgs::Marker> ("green_ring_point", 1);
 
   ros::spin ();
 }

@@ -79,6 +79,10 @@ add_executable (minicut_segmentation src/minicut_segmentation.cpp)
 add_executable (region_growing src/region_growing.cpp)
 add_executable (centroid_estimation src/centroid_estimation.cpp)
 
+add_executable(save_waypoints src/save_waypoints.cpp)
+target_link_libraries(save_waypoints ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
+
 add_executable(main src/main.cpp)
 target_link_libraries(main ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 

@@ -12,7 +12,7 @@ using namespace std;
 using namespace cv;
 
 #include "json.hpp"
-#include "waypoint.hpp"
+
 #include <fstream>
 using json = nlohmann::json;
 
@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
         char c=waitKey(30);
         
         if(c==32) {
-            ofstream file("/home/gal/ROS/src/rins_task_1/waypoints.json");
+            ofstream file("/home/gal/ROS/src/exercise6/waypoints.json");
             json j;
             j["waypoints"]=waypoints;
             file << j.dump();

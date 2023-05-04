@@ -5,6 +5,7 @@ project(exercise6)
 find_package(Boost REQUIRED COMPONENTS system filesystem thread)
 find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED)
+find_package(OpenCV)
 
 ## Find catkin packages
 find_package(catkin REQUIRED COMPONENTS
@@ -33,6 +34,7 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   ${Eigen_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 ## Add link directories
@@ -63,6 +65,7 @@ catkin_package(
     Eigen
     PCL
 )
+
 
 add_executable (example src/example.cpp)
 add_executable (example_voxelgrid src/example_voxelgrid.cpp)

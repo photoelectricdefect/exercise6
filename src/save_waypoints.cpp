@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
         char c=waitKey(30);
         
         if(c==32) {
-            ofstream file("/home/gal/ROS/src/exercise6/waypoints.json");
+            ofstream file("/home/nejc/faks/RINS/ros/src/exercise6/waypoints.json");
             json j;
             j["waypoints"]=waypoints;
             file << j.dump();

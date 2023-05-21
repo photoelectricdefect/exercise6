@@ -1,7 +1,7 @@
 <launch>
-    <arg name="map_file" default="$(find exercise6)/map.yaml"/>
+    <arg name="map_file" default="$(find task3)/map.yaml"/>
     <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
 
-    <include file="$(find exercise6)/launch/gmapping_simulation.launch"/>
-    <node pkg="exercise6" type="save_waypoints" name="save_waypoints"  output="screen"/>
+    <include file="$(find task3)/launch/gmapping_simulation.launch"/>
+    <node pkg="task3" type="save_waypoints_task3" name="save_waypoints_task3"  output="screen"/>
 </launch>

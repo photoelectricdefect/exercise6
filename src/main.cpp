@@ -63,7 +63,7 @@ void markerCallback(const visualization_msgs::Marker::ConstPtr& msg)
     // if (msg->markers.size() > num_of_faces) {
     //     new_face = true;
     //     num_of_faces = msg->markers.size();
-    //     std::string cmd = "aplay /home/nejc/faks/RINS/ros/src/exercise6/halo.wav";
+    //     std::string cmd = "aplay /home/nejc/faks/RINS/ros/src/task3/halo.wav";
     //     std::system(cmd.c_str());
     // }
 }
@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
     move_base_client ac("move_base", true);
     ros::Publisher pub = n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1000);
     ros::Publisher parking_pub = n.advertise<std_msgs::String>("/park_command", 1000);
-    ros::Publisher arm_pub = n.advertise<std_msgs::String>("arm_topic", 10);
+    ros::Publisher arm_pub = n.advertise<std_msgs::String>("/arm_command", 10);
     
     ros::Subscriber sub_green_point = n.subscribe("green_ring_point", 1000, &markerCallback);
     
@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
     // waypoints.push_back(waypoint(-0.15,-0.3));
     // waypoints.push_back(waypoint(-0.85,0.1));
 
-    std::ifstream i("/home/gal/ROS/src/exercise6/waypoints.json");
+    std::ifstream i("/home/nejc/faks/RINS/ros/src/task3/waypoints.json");
     json j;
     i >> j;    
     waypoints=j["waypoints"].get<std::vector<std::vector<float>>>();

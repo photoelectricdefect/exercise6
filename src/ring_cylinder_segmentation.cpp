@@ -49,7 +49,7 @@ bool red_ring_detected = false, black_ring_detected = false, green_ring_detected
 void
 cloud_cb_arm (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
 {
-  std::cerr << "CIGO____1 CIGO_____1 CIGO_____1" << std::endl;
+  // std::cerr << "CIGO____1 CIGO_____1 CIGO_____1" << std::endl;
 
   ros::Time time_rec_0, time_rec_1, time_test;
   time_rec_0 = ros::Time::now();
@@ -82,6 +82,11 @@ cloud_cb_arm (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   pass.setFilterFieldName("y");
   pass.setFilterLimits(-0.5, 0.1);
   pass.filter(*cloud_filtered);
+
+  if(cloud_filtered->points.size ()<10) {
+    // std::cerr << "Can't find the ring component." << std::endl;
+    return;
+  }
 
   //std::cerr << "PointCloud after filtering has: " << cloud_filtered->points.size () << " data points." << std::endl;
 
@@ -120,8 +125,8 @@ cloud_cb_arm (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   ////////////////////////////////////
   ////////////////////////////////////
 
-  if(cloud_ring->points.empty ()) {
-    std::cerr << "Can't find the ring component." << std::endl;
+  if(cloud_ring->points.size ()<10) {
+    // std::cerr << "Can't find the ring component." << std::endl;
   }
   else {
     pcl::compute3DCentroid (*cloud_ring, centroid_ring);
@@ -144,7 +149,7 @@ cloud_cb_arm (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
     }
     catch (tf2::TransformException &ex)
     {
-      ROS_WARN("Transform warning: %s\n", ex.what());
+      // ROS_WARN("Transform warning: %s\n", ex.what());
     }
 
     tf2::doTransform(point_camera_ring, point_map_ring, tss_ring);
@@ -198,42 +203,60 @@ cloud_cb_arm (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
     Eigen::Vector3f c_avg(r_avg,g_avg,b_avg);
     Eigen::Vector3f R(255,0,0);
     Eigen::Vector3f G(0,255,0);
-    Eigen::Vector3f B(58,143,255);
+    // Eigen::Vector3f B(58,143,255);
+    Eigen::Vector3f B(0,0,255);
     Eigen::Vector3f Black(0,0,0);
     Eigen::Vector3f gray(128,128,128);
+    Eigen::Vector3f white(255,255,255);
 
     double d_R=(c_avg-R).norm();
     double d_G=(c_avg-G).norm();
     double d_B=(c_avg-B).norm();
     double d_black=(c_avg-Black).norm();
     double d_gray=(c_avg-gray).norm();
+    double d_white=(c_avg-white).norm();
 
     double c_min=std::min(1e6,d_R);
     c_min=std::min(c_min,d_G);
     c_min=std::min(c_min,d_B);
     c_min=std::min(c_min,d_black);
-    c_min=std::min(c_min,d_gray);
+    // c_min=std::min(c_min,d_gray);
 
-    std::cerr << "AVERAGE RING COLOR IS: " << r_avg << ", " << g_avg << ", " << b_avg << std::endl;
+    // std::cerr << "AVERAGE RING COLOR IS: " << r_avg << ", " << g_avg << ", " << b_avg << std::endl;
+    // std::cerr << "d_gray: " << d_gray << std::endl;
 
 
+    // if(d_gray < 150) {
+    //   std::cerr << "ababa" << std::endl;
+    // }
+    // else 
     if(c_min==d_black) {
-        std::cout << "Black ring detected!" << std::endl;
-        if (!black_ring_detected) {
+        // std::cout << "Black ring detected!" << std::endl;
+
+        // if(d_white < d_black) {
+        //   std::cout << "FLAT!" << std::endl;
+        // }
+
+        if (!black_ring_detected /*&& d_white > d_black*/) {
           marker_ring.color.r=0.0f;
           marker_ring.color.g=0.0f;
           marker_ring.color.b=0.0f;
           ring_candidates_array.markers.push_back(marker_ring);
           publish_ring_candidates.publish(ring_candidates_array);
           black_ring_detected = true;
-          std::string cmd = "aplay /home/gal/ROS/src/exercise6/black_ring.wav";
+          std::string cmd = "aplay /home/nejc/faks/RINS/ros/src/task3/black_ring.wav";
           std::system(cmd.c_str());
         }
     } 
 
     else if(c_min==d_G) {
-        std::cout << "Green ring detected!" << std::endl;
-        if (!green_ring_detected) {
+        // std::cout << "Green ring detected!" << std::endl;
+
+        if(d_white < d_G) {
+          // std::cout << "FLAT!" << std::endl;
+        }
+
+        if (!green_ring_detected && d_white > d_G) {
           marker_ring.color.r=0.0f;
           marker_ring.color.g=1.0f;
           marker_ring.color.b=0.0f;
@@ -243,62 +266,65 @@ cloud_cb_arm (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
           green_ring_pub.publish(marker_ring);
 
           green_ring_detected = true;
-          std::string cmd = "aplay /home/gal/ROS/src/exercise6/green_ring.wav";
+          std::string cmd = "aplay /home/nejc/faks/RINS/ros/src/task3/green_ring.wav";
           std::system(cmd.c_str());
         }
     } 
 
     else if(c_min==d_B) {
-        std::cout << "Blue ring detected!" << std::endl;
-        if (!black_ring_detected) {
+        // std::cout << "Blue ring detected!" << std::endl;
+
+        // if(d_white < d_B) {
+        //   std::cout << "FLAT!" << std::endl;
+        // }
+
+        if (!blue_ring_detected /*&& d_white > d_B*/) {
           marker_ring.color.r=0.0f;
           marker_ring.color.g=0.0f;
           marker_ring.color.b=1.0f;
           ring_candidates_array.markers.push_back(marker_ring);
           publish_ring_candidates.publish(ring_candidates_array);
           blue_ring_detected = true;
-          std::string cmd = "aplay /home/gal/ROS/src/exercise6/blue_ring.wav";
-          std::system(cmd.c_str());
+          // std::string cmd = "aplay /home/nejc/faks/RINS/ros/src/task3/blue_ring.wav";
+          // std::system(cmd.c_str());
         }
     } 
    
     else if(c_min==d_R) {
-        std::cout << "Red ring detected!" << std::endl;
-        if (!red_ring_detected) {
+        // std::cout << "Red ring detected!" << std::endl;
+
+        // if(d_white < d_R) {
+        //   std::cout << "FLAT!" << std::endl;
+        // }
+
+        if (!red_ring_detected /*&& d_white > d_R*/) {
           marker_ring.color.r = 1.0f;
           marker_ring.color.g = 0.0f;
           marker_ring.color.b = 0.0f;
           ring_candidates_array.markers.push_back(marker_ring);
           publish_ring_candidates.publish(ring_candidates_array);
           red_ring_detected = true;
-          std::string cmd = "aplay /home/gal/ROS/src/exercise6/red_ring.wav";
-          std::system(cmd.c_str());
+          // std::string cmd = "aplay /home/nejc/faks/RINS/ros/src/task3/red_ring.wav";
+          // std::system(cmd.c_str());
         }
     } 
 
-    else if(c_min==d_gray) {    
-        std::cout << "No ring color detected." << std::endl;
-    }
-
-
-
-    
-    
-
-
+    // else if(c_min==d_gray) {    
+    //     std::cout << "No ring color detected." << std::endl;
+    // }
   
-    std::cerr << "Ring FOUND" << std::endl;
-    std::cerr << "Ring FOUND" << std::endl;
-    std::cerr << "Ring FOUND" << std::endl;
-    std::cerr << "Ring FOUND" << std::endl;
-    std::cerr << "Ring FOUND" << std::endl;
+    // std::cerr << "Ring FOUND" << std::endl;
+    // std::cerr << "Ring FOUND" << std::endl;
+    // std::cerr << "Ring FOUND" << std::endl;
+   //  std::cerr << "Ring FOUND" << std::endl;
+    // std::cerr << "Ring FOUND" << std::endl;
   }
 }
 
 void
 cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
 {
-	std::cerr << "CIGO CIGO CIGO" << std::endl;
+	// std::cerr << "CIGO CIGO CIGO" << std::endl;
 
   ros::Time time_rec_0,time_rec_1, time_test;
   time_rec_0 = ros::Time::now();
@@ -334,6 +360,11 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   pass.filter (*cloud_filtered);
   //std::cerr << "PointCloud after filtering has: " << cloud_filtered->points.size () << " data points." << std::endl;
 
+  if(cloud_filtered->points.size ()<10) {
+    // std::cerr << "Can't find the ring component." << std::endl;
+    return;
+  }
+
   ne.setSearchMethod (tree);
   ne.setInputCloud (cloud_filtered);
   ne.setKSearch (50);
@@ -342,7 +373,7 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   int iter = 0, nr_points = (int) cloud_filtered->size();
   int size_cloud_filtered=cloud_filtered->size();
 
-  while (iter < 5 && size_cloud_filtered > 0) {
+  while (iter < 5 && size_cloud_filtered >= 10) {
     seg.setOptimizeCoefficients (true);
     seg.setModelType (pcl::SACMODEL_NORMAL_PLANE);
     seg.setNormalDistanceWeight (0.1);
@@ -391,8 +422,8 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
     iter++;
   }
 
-  if(size_cloud_filtered <= 0) {
-    std::cerr << "Can't find the cylindrical component." << std::endl;
+  if(size_cloud_filtered < 10) {
+    // std::cerr << "Can't find the cylindrical component." << std::endl;
     return;
   }
 
@@ -457,8 +488,9 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
   ////////////////////////////////////
   ////////////////////////////////////
 
-  if (cloud_cylinder->points.empty () || (angle_y>5&&angle_y<175) || cyl_radius>0.15 || cyl_radius<0.08)
-    std::cerr << "Can't find the cylindrical component." << std::endl;
+  if (cloud_cylinder->points.size ()<10 || (angle_y>5&&angle_y<175) || cyl_radius>0.15 || cyl_radius<0.08) {
+   //  std::cerr << "Can't find the cylindrical component." << std::endl;
+  }
   else {
     pcl::compute3DCentroid (*cloud_cylinder, centroid_cylinder);
 
@@ -487,7 +519,7 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
     }
     catch (tf2::TransformException &ex)
     {
-      ROS_WARN("Transform warning: %s\n", ex.what());
+      // ROS_WARN("Transform warning: %s\n", ex.what());
     }
 
     tf2::doTransform(point_camera_cylinder, point_map_cylinder, tss_cylinder);
@@ -565,13 +597,13 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
     c_min=std::min(c_min,d_Y);
     c_min=std::min(c_min,d_gray);
 
-    std::cerr << "AVERAGE COLOR IS: " << r_avg << ", " << g_avg << ", " << b_avg << std::endl;
+    // std::cerr << "AVERAGE COLOR IS: " << r_avg << ", " << g_avg << ", " << b_avg << std::endl;
 
     // if (r_avg >= yellow_lower_r && r_avg <= yellow_upper_r &&
     //     g_avg >= yellow_lower_g && g_avg <= yellow_upper_g &&
     //     b_avg >= yellow_lower_b && b_avg <= yellow_upper_b) {
     if(c_min==d_Y) {
-        std::cout << "Yellow detected!" << std::endl;
+        // std::cout << "Yellow detected!" << std::endl;
         if (!yellow_detected) {
           marker_cylinder.color.r = 1.0f;
           marker_cylinder.color.g = 1.0f;
@@ -579,15 +611,15 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
           cylinder_candidates_array.markers.push_back(marker_cylinder);
           publish_cylinder_candidates.publish(cylinder_candidates_array);
           yellow_detected = true;
-          std::string cmd = "aplay /home/gal/ROS/src/exercise6/yellow_cylinder.wav";
-          std::system(cmd.c_str());
+         //  std::string cmd = "aplay /home/nejc/faks/RINS/ros/src/task3/yellow_cylinder.wav";
+          // std::system(cmd.c_str());
         }
     } 
     // else if (r_avg >= green_lower_r && r_avg <= green_upper_r &&
     //            g_avg >= green_lower_g && g_avg <= green_upper_g &&
     //            b_avg >= green_lower_b && b_avg <= green_upper_b) {
     else if(c_min==d_G) {
-        std::cout << "Green detected!" << std::endl;
+        // std::cout << "Green detected!" << std::endl;
         if (!green_detected) {
           marker_cylinder.color.r = 0.0f;
           marker_cylinder.color.g = 1.0f;
@@ -595,15 +627,15 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
           cylinder_candidates_array.markers.push_back(marker_cylinder);
           publish_cylinder_candidates.publish(cylinder_candidates_array);
           green_detected = true;
-          std::string cmd = "aplay /home/gal/ROS/src/exercise6/green_cylinder.wav";
-          std::system(cmd.c_str());
+          // std::string cmd = "aplay /home/nejc/faks/RINS/ros/src/task3/green_cylinder.wav";
+          // std::system(cmd.c_str());
         }
     } 
     // else if (r_avg >= blue_lower_r && r_avg <= blue_upper_r &&
     //            g_avg >= blue_lower_g && g_avg <= blue_upper_g &&
     //            b_avg >= blue_lower_b && b_avg <= blue_upper_b) {
     else if(c_min==d_B) {
-        std::cout << "Blue detected!" << std::endl;
+        // std::cout << "Blue detected!" << std::endl;
         if (!blue_detected) {
           marker_cylinder.color.r = 0.0f;
           marker_cylinder.color.g = 0.0f;
@@ -611,15 +643,15 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
           cylinder_candidates_array.markers.push_back(marker_cylinder);
           publish_cylinder_candidates.publish(cylinder_candidates_array);
           blue_detected = true;
-          std::string cmd = "aplay /home/gal/ROS/src/exercise6/blue_cylinder.wav";
-          std::system(cmd.c_str());
+          // std::string cmd = "aplay /home/nejc/faks/RINS/ros/src/task3/blue_cylinder.wav";
+          // std::system(cmd.c_str());
         }
     } 
     // else if (r_avg >= red_lower_r && r_avg <= red_upper_r &&
     //            g_avg >= red_lower_g && g_avg <= red_upper_g &&
     //            b_avg >= red_lower_b && b_avg <= red_upper_b) {
     else if(c_min==d_R) {
-        std::cout << "Red detected!" << std::endl;
+        // std::cout << "Red detected!" << std::endl;
         if (!red_detected) {
           marker_cylinder.color.r = 1.0f;
           marker_cylinder.color.g = 0.0f;
@@ -627,24 +659,24 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
           cylinder_candidates_array.markers.push_back(marker_cylinder);
           publish_cylinder_candidates.publish(cylinder_candidates_array);
           red_detected = true;
-          std::string cmd = "aplay /home/gal/ROS/src/exercise6/red_cylinder.wav";
-          std::system(cmd.c_str());
+          // std::string cmd = "aplay /home/nejc/faks/RINS/ros/src/task3/red_cylinder.wav";
+          // std::system(cmd.c_str());
         }
     } 
     // else {
     else if(c_min==d_gray) {    
-        std::cout << "No color detected." << std::endl;
+        // std::cout << "No color detected." << std::endl;
     }
 
     // Create an RGB color object from the average values
     //pcl::RGB avg_color(r_avg, g_avg, b_avg);
 
     // std::cerr << "Cylinder RADIUS: " << cyl_radius << std::endl;
-    std::cerr << "Cylinder FOUND" << std::endl;
-    std::cerr << "Cylinder FOUND" << std::endl;
-    std::cerr << "Cylinder FOUND" << std::endl;
-    std::cerr << "Cylinder FOUND" << std::endl;
-    std::cerr << "Cylinder FOUND" << std::endl;
+    // std::cerr << "Cylinder FOUND" << std::endl;
+   //  std::cerr << "Cylinder FOUND" << std::endl;
+    // std::cerr << "Cylinder FOUND" << std::endl;
+    // std::cerr << "Cylinder FOUND" << std::endl;
+    // std::cerr << "Cylinder FOUND" << std::endl;
   }
 
   // if(cloud_ring->points.empty ()) {
@@ -740,6 +772,17 @@ cloud_cb (const pcl::PCLPointCloud2ConstPtr& cloud_blob)
 
 }
 
+void markerCallback(const visualization_msgs::MarkerArray::ConstPtr& msg)
+{
+
+    // if (msg->markers.size() > num_of_faces) {
+    //     new_face = true;
+    //     num_of_faces = msg->markers.size();
+    //     // std::string cmd = "aplay /home/gal/ROS/src/task3/halo.wav";
+    //     // std::system(cmd.c_str());
+    // }
+}
+
 int
 main (int argc, char** argv)
 {
@@ -751,6 +794,7 @@ main (int argc, char** argv)
   tf2_ros::TransformListener tf2_listener(tf2_buffer);
   ros::Subscriber sub = nh.subscribe ("input", 1, cloud_cb);
   ros::Subscriber sub_arm = nh.subscribe ("/arm_camera/depth/points", 1, cloud_cb_arm);
+  ros::Subscriber sub_face_markers = nh.subscribe("face_markers", 1000, &markerCallback);
 
   publish_cylinder_candidates = nh.advertise<visualization_msgs::MarkerArray>("cylinder_markers", 10);
   publish_ring_candidates = nh.advertise<visualization_msgs::MarkerArray>("ring_markers", 10);

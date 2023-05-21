@@ -1,18 +1,20 @@
 <launch>
-    <include file="$(find exercise6)/launch/rins_world.launch"/>
-    <include file="$(find exercise6)/launch/amcl_simulation.launch"/>
+    <include file="$(find task3)/launch/rins_world.launch"/>
+    <include file="$(find task3)/launch/amcl_simulation.launch"/>
     <include file="$(find turtlebot_rviz_launchers)/launch/view_navigation.launch"/>
 
-    <node pkg="exercise6" type="main" name="main"  output="screen"/>
-    <node pkg="exercise6" type="parking.py" name="parking"  output="screen"/>
-    <node pkg="exercise6" type="ring_cylinder_segmentation" name="ring_cylinder_segmentation" output="screen">
+    <node pkg="task3" type="main_task3" name="main_task3"/>
+    <node pkg="task3" type="parking.py" name="parking"/>
+    <node pkg="task3" type="face_localizer_custom" name="face_localizer_node" output="screen"/>
+    <node pkg="exercise7" type="move_arm.py" name="move_arm"/>
+    <node pkg="task3" type="ring_cylinder_segmentation_task3" name="ring_cylinder_segmentation_task3">
         <remap from="input" to="/camera/depth/points"/>
     </node>
 
-    <!-- <node pkg="exercise6" type="cylinder_segmentation" name="cylinder_segmentation_node" output="screen"/> -->
+    <!-- <node pkg="task3" type="cylinder_segmentation" name="cylinder_segmentation_node" output="screen"/> -->
 
-    <!-- <node pkg="exercise6" type="detect_rings" name="detect_rings_node" output="screen"/> -->
+    <!-- <node pkg="task3" type="detect_rings" name="detect_rings_node" output="screen"/> -->
 
-    <!-- <node pkg="exercise6" type="face_localizer_dlib" name="face_localizer_node" /> -->
+    <!-- <node pkg="task3" type="face_localizer_dlib" name="face_localizer_node" /> -->
     
 </launch>

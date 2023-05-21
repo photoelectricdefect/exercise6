@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(exercise6)
+project(task3)
 
 ## Find system dependencies
 find_package(Boost REQUIRED COMPONENTS system filesystem thread)
@@ -67,26 +67,17 @@ catkin_package(
 )
 
 
-add_executable (example src/example.cpp)
-add_executable (example_voxelgrid src/example_voxelgrid.cpp)
-add_executable (planes src/planes.cpp)
-add_executable (find_plane src/find_plane.cpp)
-add_executable (dominant_plane_with_obstacle_clustering src/dominant_plane_with_obstacle_clustering.cpp)
-add_executable (cylinder_segmentation src/cylinder_segmentation.cpp)
-add_executable (ring_cylinder_segmentation src/ring_cylinder_segmentation.cpp)
+add_executable (ring_cylinder_segmentation_task3 src/ring_cylinder_segmentation.cpp)
 
 #rosbuild_add_executable (cloud_viewer src/cloud_viewer.cpp)
 #rosbuild_add_executable (pose_estimation_cluster src/pose_estimation_cluster.cpp)
 #add_executable (don_segmentation src/don_segmentation.cpp)
-add_executable (minicut_segmentation src/minicut_segmentation.cpp)
-add_executable (region_growing src/region_growing.cpp)
-add_executable (centroid_estimation src/centroid_estimation.cpp)
 
-add_executable(save_waypoints src/save_waypoints.cpp)
-target_link_libraries(save_waypoints ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+add_executable(save_waypoints_task3 src/save_waypoints.cpp)
+target_link_libraries(save_waypoints_task3 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 
-add_executable(main src/main.cpp)
-target_link_libraries(main ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+add_executable(main_task3 src/main.cpp)
+target_link_libraries(main_task3 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
-catkin_install_python(PROGRAMS scripts/detect_rings DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+catkin_install_python(PROGRAMS scripts/parking.py scripts/face_localizer_custom DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})

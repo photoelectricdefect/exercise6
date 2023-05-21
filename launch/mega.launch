@@ -1,8 +1,0 @@
-<launch>
-    <include file="$(find exercise7)/launch/rins_world.launch"/>
-    <include file="$(find turtlebot_custom_navigation)/launch/amcl_simulation.launch"/>
-  
-    <include file="$(find turtlebot_rviz_launchers)/launch/view_navigation.launch"/>
-
-</launch>
-
